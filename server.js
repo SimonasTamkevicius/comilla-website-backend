@@ -35,7 +35,14 @@ app.use(
   })
 );
 
-app.use(cors());
+const corsOptions = {
+  origin: ["https://comilla-website.onrender.com"],
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
+
 app.use("/uploads", express.static("uploads"));
 
 const storage = multer.diskStorage({
