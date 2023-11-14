@@ -40,10 +40,7 @@ const corsOptions = {
   credentials: true,
 };
 
-app.use("/uploads", cors(corsOptions), express.static("uploads"));
 app.use(cors(corsOptions));
-app.options("*", cors(corsOptions));
-
 app.use("/uploads", express.static("uploads"));
 
 const storage = multer.diskStorage({
