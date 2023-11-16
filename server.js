@@ -7,7 +7,29 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import multer from "multer";
 import mailjet from 'node-mailjet';
+import crypto from "crypto";
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+} from "@aws-sdk/client-s3";
 dotenv.config();
+
+const randomImageName = (bytes = 32) =>
+  crypto.randomBytes(bytes).toString("hex");
+
+const bucketRegion = process.env.BUCKET_REGION;
+const bucketName = process.env.BUCKET_NAME;
+const accessKey = process.env.ACCESS_KEY;
+const secretAccessKey = process.env.SECRET_ACCESS_KEY;
+
+const s3 = new S3Client({
+  credentials: {
+    accessKeyId: accessKey,
+    secretAccessKey: secretAccessKey,
+  },
+  region: bucketRegion,
+});
 
 const mailjetClient = mailjet.apiConnect(
   process.env.MJ_APIKEY_PUBLIC,
@@ -17,14 +39,14 @@ const mailjetClient = mailjet.apiConnect(
 const saltRounds = 10;
 
 const connectDB = async () => {
-    try {
-      const conn = await mongoose.connect(process.env.MONGO_URI);
-      console.log(`MongoDB Connected: ${conn.connection.host}`);
-    } catch (error) {
-      console.log(error);
-      process.exit(1);
-    }
-}
+  try {
+    const conn = await mongoose.connect(process.env.MONGO_URI);
+    console.log(`MongoDB Connected: ${conn.connection.host}`);
+  } catch (error) {
+    console.log(error);
+    process.exit(1);
+  }
+};
 
 const app = express();
 
@@ -36,21 +58,14 @@ app.use(
 );
 
 const corsOptions = {
-  origin: ["https://comilla-website.onrender.com"],
+  origin: ["https://comilla-website.onrender.com", "http://localhost:5173"],
   credentials: true,
 };
 
 app.use(cors(corsOptions));
 app.use("/uploads", express.static("uploads"));
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/');
-  },
-  filename: function (req, file, cb) {
-    cb(null, file.originalname);
-  },
-});
+const storage = multer.memoryStorage();
 
 const upload = multer({
   storage: storage,
@@ -64,16 +79,17 @@ const upload = multer({
 ]);
 
 const userSchema = {
-    email: String,
-    password: String
-}
+  email: String,
+  password: String,
+};
 
 const projectSchema = {
-    name: String,
-    description: String,
-    location: String,
-    images: [String]
-}
+  name: String,
+  description: String,
+  location: String,
+  imageName: [String],
+  images: [String],
+};
 
 const eventSchema = {
   name: String,
@@ -81,115 +97,129 @@ const eventSchema = {
   location: String,
   date: String,
   time: String,
-  images: [String]
-}
+  imageName: [String],
+  images: [String],
+};
 
 const User = mongoose.model("User", userSchema);
 const Project = mongoose.model("Project", projectSchema);
 const Event = mongoose.model("Event", eventSchema);
 
+// Function to upload an image to S3
+const uploadImageToS3 = async (file, folder) => {
+  const params = {
+    Bucket: bucketName,
+    Key: `${folder}/${file.originalname}`,
+    Body: file.buffer,
+    ContentType: file.mimetype,
+  };
+
+  await s3.send(new PutObjectCommand(params));
+  return params.Key;
+};
+
 app.post("/login", async (req, res) => {
-    try {
-      const { email, password } = req.body;
+  try {
+    const { email, password } = req.body;
+
+    const foundUser = await User.findOne({ email: email.toLowerCase() }).exec();
+
+    if (!foundUser) {
+      return res.status(400).json({ message: "User not found" });
+    } else {
+      const result = await bcrypt.compare(password, foundUser.password);
+      if (result) {
+          const accessToken = jwt.sign(foundUser._id.toJSON(), process.env.ACCESS_TOKEN_SECRET);
+
+          res.cookie("access_token", accessToken, {
+            httpOnly: true,
+            secure: true,
+            maxAge: 10 * 60 * 1000,
+          });
   
-      const foundUser = await User.findOne({ email: email.toLowerCase() }).exec();
-
-      if (!foundUser) {
-        return res.status(400).json({ message: "User not found" });
+          res.status(200).json({
+            message: "Login successful",
+            accessToken: accessToken,
+            _id: foundUser._id,
+            email: foundUser.email
+          });
       } else {
-        const result = await bcrypt.compare(password, foundUser.password);
-        if (result) {
-            const accessToken = jwt.sign(foundUser._id.toJSON(), process.env.ACCESS_TOKEN_SECRET);
-
-            res.cookie("access_token", accessToken, {
-              httpOnly: true,
-              secure: true,
-              maxAge: 10 * 60 * 1000,
-            });
-    
-            res.status(200).json({
-              message: "Login successful",
-              accessToken: accessToken,
-              _id: foundUser._id,
-              email: foundUser.email
-            });
-        } else {
-          res.status(400).json({ message: "Incorrect password" });
-        }
+        res.status(400).json({ message: "Incorrect password" });
       }
-    } catch (err) {
-      console.log(err);
-      res.status(500).json({ message: "Internal Server Error" });
     }
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
 });  
 
 app.post("/register", async (req, res) =>{
-    try {
-        const {email, password} = req.body;
+  try {
+      const {email, password} = req.body;
 
-        const hashedPassword = await bcrypt.hash(password, saltRounds);
+      const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-        const newUser = new User({
-            email: email.toLowerCase(),
-            password: hashedPassword
-        });
+      const newUser = new User({
+          email: email.toLowerCase(),
+          password: hashedPassword
+      });
 
-        newUser.save()
-        res.json({message: "Successfully registered!"})
-    }
-    catch (err) {
-        console.log(err);
-    }
+      newUser.save()
+      res.json({message: "Successfully registered!"})
+  }
+  catch (err) {
+      console.log(err);
+  }
 })
 
 app.post("/edit-email", async (req, res) => {
-  try {
-    const { _id, email } = req.body;
-    
-    const foundUser = await User.findOneAndUpdate(
-      { _id: _id },
-      { email: email },
-    ).exec();
+try {
+  const { _id, email } = req.body;
+  
+  const foundUser = await User.findOneAndUpdate(
+    { _id: _id },
+    { email: email },
+  ).exec();
 
-    if (foundUser) {
-      res.status(200).json({ message: "Email updated successfully", _id, email });
-    } else {
-      res.status(404).json({ message: "User not found" });
-    }
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Internal Server Error" });
+  if (foundUser) {
+    res.status(200).json({ message: "Email updated successfully", _id, email });
+  } else {
+    res.status(404).json({ message: "User not found" });
   }
+} catch (err) {
+  console.error(err);
+  res.status(500).json({ message: "Internal Server Error" });
+}
 });
 
 app.post("/change-password", async (req, res) => {
-  try {
-    const { _id, oldPassword, newPassword, confirmNewPassword } = req.body;
+try {
+  const { _id, oldPassword, newPassword, confirmNewPassword } = req.body;
 
-    const foundUser = await User.findById({ _id: _id });
+  const foundUser = await User.findById({ _id: _id });
 
-    if (foundUser) {
-      console.log("found user");
-      const result = await bcrypt.compare(oldPassword, foundUser.password);
-      if (result) {
-        if (newPassword === confirmNewPassword) {
-          const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
-          await User.findByIdAndUpdate(_id, { password: hashedPassword }).exec();
-          res.status(200).json({ message: "Password updated successfully" });
-        } else {
-          return res.status(404).json({ message: "New passwords do not match" });
-        }
+  if (foundUser) {
+    console.log("found user");
+    const result = await bcrypt.compare(oldPassword, foundUser.password);
+    if (result) {
+      if (newPassword === confirmNewPassword) {
+        const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+        await User.findByIdAndUpdate(_id, { password: hashedPassword }).exec();
+        res.status(200).json({ message: "Password updated successfully" });
+      } else {
+        return res.status(404).json({ message: "New passwords do not match" });
       }
-      else {
-        return res.status(404).json({ message: "Incorrect old password" });
-      }
-    } else {
-      res.status(404).json({ message: "User not found" });
     }
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Internal Server Error" });
+    else {
+      return res.status(404).json({ message: "Incorrect old password" });
+    }
+  } else {
+    res.status(404).json({ message: "User not found" });
   }
+} catch (err) {
+  console.error(err);
+  res.status(500).json({ message: "Internal Server Error" });
+}
 })
 
 app.get("/project", async (req, res) => {
@@ -206,11 +236,30 @@ app.post('/project', upload, async (req, res) => {
     const { name, description, location } = req.body;
 
     const uploadedImages = {};
+    const imageNameArray = [];
+    const urlArray = [];
 
     for (let i = 1; i <= 6; i++) {
       const fieldName = `image${i}`;
       if (req.files[fieldName]) {
-        uploadedImages[fieldName] = req.files[fieldName][0].filename;
+        const file = req.files[fieldName][0];
+        const fileName = `${Date.now()}_${file.originalname}`;
+        uploadedImages[fieldName] = fileName;
+
+        const imageName = randomImageName();
+        imageNameArray.push(imageName)
+
+        const uploadParams = {
+          Bucket: bucketName,
+          Key: imageName,
+          Body: file.buffer,
+          ContentType: file.mimetype,
+        };
+
+        await s3.send(new PutObjectCommand(uploadParams));
+
+        const url = `https://${bucketName}.s3.${bucketRegion}.amazonaws.com/${imageName}`;
+        urlArray.push(url);
       }
     }
 
@@ -222,7 +271,8 @@ app.post('/project', upload, async (req, res) => {
         name,
         description,
         location,
-        images: Object.values(uploadedImages),
+        imageName: imageNameArray,
+        images: urlArray,
       });
 
       await newProject.save();
@@ -238,23 +288,48 @@ app.patch('/project', upload, async (req, res) => {
   try {
     const { _id, name, description, location } = req.body;
 
+    console.log(name, description, location);
+
     const currentProject = await Project.findById(_id).exec();
 
     if (!currentProject) {
       return res.status(400).json({ message: 'Project not found.' });
     }
 
-    let updatedImages = [];
-
-    const existingImages = currentProject.images;
-    updatedImages = [...existingImages];
+    const updatedImageNames = currentProject.imageName;
+    const urlArray = [];
 
     for (let i = 1; i <= 6; i++) {
       const fieldName = `image${i}`;
       if (req.files[fieldName]) {
-        updatedImages[i - 1] = req.files[fieldName][0].filename;
-      } else if (existingImages.includes(fieldName)) {
-        updatedImages[i - 1] = existingImages.find(existingImage => existingImage.startsWith(fieldName));
+        const updatingImage = currentProject.imageName[i-1];
+        if (updatingImage) {
+          let params = {
+            Bucket: bucketName,
+            Key: updatingImage
+          }
+          const deleteCommand = new DeleteObjectCommand(params);
+          await s3.send(deleteCommand);
+        } 
+
+        const file = req.files[fieldName][0];
+        const imageName = randomImageName();
+        updatedImageNames[i - 1] = imageName;
+
+        const uploadParams = {
+          Bucket: bucketName,
+          Key: imageName,
+          Body: file.buffer,
+          ContentType: file.mimetype,
+        };
+
+        await s3.send(new PutObjectCommand(uploadParams));
+
+        const url = `https://${bucketName}.s3.${bucketRegion}.amazonaws.com/${imageName}`;
+        urlArray.push(url);
+      } else if (currentProject.images[i - 1]) {
+        // If no new file for this field, use the existing URL
+        urlArray.push(currentProject.images[i - 1]);
       }
     }
 
@@ -262,7 +337,8 @@ app.patch('/project', upload, async (req, res) => {
       name,
       description,
       location,
-      images: Object.values(updatedImages),
+      imageName: updatedImageNames,
+      images: urlArray,
     };
 
     const updatedProject = await Project.findByIdAndUpdate(_id, updatedFields, {
@@ -283,13 +359,23 @@ app.patch('/project', upload, async (req, res) => {
   }
 });
 
-app.delete('/project/:projectId', async (req, res) => {
+
+app.delete("/project/:projectId", async (req, res) => {
   try {
     const projectId = req.params.projectId;
 
     const foundProject = await Project.findOneAndDelete({ _id: projectId }).exec();
 
     if (foundProject) {
+      // Delete images from S3
+      for (const imgName of foundProject.imageName) {
+        const params = {
+          Bucket: bucketName,
+          Key: imgName,
+        };
+        await s3.send(new DeleteObjectCommand(params));
+      }
+
       res.status(200).json({ message: 'Project deleted successfully' });
     } else {
       res.status(404).json({ message: 'Project not found' });
@@ -302,28 +388,47 @@ app.delete('/project/:projectId', async (req, res) => {
 
 app.get("/events", async (req, res) => {
   try {
-    const events = await Event.find().exec();
-    res.json(events);
+    const foundEvents = await Event.find().exec();
+    res.json(foundEvents);
   } catch (err) {
-    console.log(err);
+    console.error(err);
+    res.status(500).json({ message: 'Internal Server Error' });
   }
 });
 
-app.post('/events', upload, async (req, res) => {
+app.post("/events", upload, async (req, res) => {
   try {
     const { name, description, location, date, time } = req.body;
 
     const uploadedImages = {};
+    const imageNameArray = [];
+    const urlArray = [];
 
     for (let i = 1; i <= 6; i++) {
       const fieldName = `image${i}`;
       if (req.files[fieldName]) {
-        uploadedImages[fieldName] = req.files[fieldName][0].filename;
+        const file = req.files[fieldName][0];
+        const fileName = `${Date.now()}_${file.originalname}`;
+        uploadedImages[fieldName] = fileName;
+
+        const imageName = randomImageName();
+        imageNameArray.push(imageName);
+
+        const uploadParams = {
+          Bucket: bucketName,
+          Key: imageName,
+          Body: file.buffer,
+          ContentType: file.mimetype,
+        };
+
+        await s3.send(new PutObjectCommand(uploadParams));
+
+        const url = `https://${bucketName}.s3.${bucketRegion}.amazonaws.com/${imageName}`;
+        urlArray.push(url);
       }
     }
 
     const foundEvent = await Event.findOne({ name }).exec();
-
     if (foundEvent) {
       return res.status(400).json({ message: 'Duplicate Event found.' });
     } else {
@@ -333,7 +438,8 @@ app.post('/events', upload, async (req, res) => {
         location,
         date,
         time,
-        images: Object.values(uploadedImages),
+        imageName: imageNameArray,
+        images: urlArray,
       });
 
       await newEvent.save();
@@ -345,7 +451,7 @@ app.post('/events', upload, async (req, res) => {
   }
 });
 
-app.patch('/events', upload, async (req, res) => {
+app.patch("/events", upload, async (req, res) => {
   try {
     const { _id, name, description, location, date, time } = req.body;
 
@@ -355,17 +461,39 @@ app.patch('/events', upload, async (req, res) => {
       return res.status(400).json({ message: 'Event not found.' });
     }
 
-    let updatedImages = [];
-
-    const existingImages = currentEvent.images;
-    updatedImages = [...existingImages];
+    const updatedImageNames = currentEvent.imageName;
+    const urlArray = [];
 
     for (let i = 1; i <= 6; i++) {
       const fieldName = `image${i}`;
       if (req.files[fieldName]) {
-        updatedImages[i - 1] = req.files[fieldName][0].filename;
-      } else if (existingImages.includes(fieldName)) {
-        updatedImages[i - 1] = existingImages.find(existingImage => existingImage.startsWith(fieldName));
+        const updatingImage = currentEvent.imageName[i - 1];
+        if (updatingImage) {
+          const deleteParams = {
+            Bucket: bucketName,
+            Key: updatingImage,
+          };
+          await s3.send(new DeleteObjectCommand(deleteParams));
+        }
+
+        const file = req.files[fieldName][0];
+        const imageName = randomImageName();
+        updatedImageNames[i - 1] = imageName;
+
+        const uploadParams = {
+          Bucket: bucketName,
+          Key: imageName,
+          Body: file.buffer,
+          ContentType: file.mimetype,
+        };
+
+        await s3.send(new PutObjectCommand(uploadParams));
+
+        const url = `https://${bucketName}.s3.${bucketRegion}.amazonaws.com/${imageName}`;
+        urlArray.push(url);
+      } else if (currentEvent.images[i - 1]) {
+        // If no new file for this field, use the existing URL
+        urlArray.push(currentEvent.images[i - 1]);
       }
     }
 
@@ -375,7 +503,8 @@ app.patch('/events', upload, async (req, res) => {
       location,
       date,
       time,
-      images: Object.values(updatedImages),
+      imageName: updatedImageNames,
+      images: urlArray,
     };
 
     const updatedEvent = await Event.findByIdAndUpdate(_id, updatedFields, {
@@ -396,13 +525,22 @@ app.patch('/events', upload, async (req, res) => {
   }
 });
 
-app.delete('/events/:eventId', async (req, res) => {
+app.delete("/events/:eventId", async (req, res) => {
   try {
     const eventId = req.params.eventId;
 
     const foundEvent = await Event.findOneAndDelete({ _id: eventId }).exec();
 
     if (foundEvent) {
+      // Delete images from S3
+      for (const imgName of foundEvent.imageName) {
+        const params = {
+          Bucket: bucketName,
+          Key: `events/${imgName}`,
+        };
+        await s3.send(new DeleteObjectCommand(params));
+      }
+
       res.status(200).json({ message: 'Event deleted successfully' });
     } else {
       res.status(404).json({ message: 'Event not found' });
