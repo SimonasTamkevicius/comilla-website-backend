@@ -118,6 +118,14 @@ const uploadImageToS3 = async (file, folder) => {
   return params.Key;
 };
 
+app.get("/", async (req, res) => {
+  try {
+    res.send("Hello World");
+  } catch (err) {
+    console.log(err);
+  }
+})
+
 app.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
