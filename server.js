@@ -105,26 +105,6 @@ const User = mongoose.model("User", userSchema);
 const Project = mongoose.model("Project", projectSchema);
 const Event = mongoose.model("Event", eventSchema);
 
-// Function to upload an image to S3
-const uploadImageToS3 = async (file, folder) => {
-  const params = {
-    Bucket: bucketName,
-    Key: `${folder}/${file.originalname}`,
-    Body: file.buffer,
-    ContentType: file.mimetype,
-  };
-
-  await s3.send(new PutObjectCommand(params));
-  return params.Key;
-};
-
-app.get("/", async (req, res) => {
-  try {
-    res.send("Hello World");
-  } catch (err) {
-    console.log(err);
-  }
-})
 
 app.post("/login", async (req, res) => {
   try {
