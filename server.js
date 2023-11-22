@@ -58,7 +58,7 @@ app.use(
 );
 
 const corsOptions = {
-  origin: ["https://comilla-website.onrender.com", "http://localhost:5173", "https://comilla-website.vercel.app"],
+  origin: ["https://comilla-website-het6.onrender.com", "http://localhost:5173", "https://comilla-website.vercel.app"],
   credentials: true,
 };
 
