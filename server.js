@@ -57,12 +57,13 @@ app.use(
   })
 );
 
-const corsOptions = {
-  origin: ["https://comilla-website-het6.onrender.com", "http://localhost:5173", "https://comilla-website.vercel.app", "https://www.comillainc.com"],
-  credentials: true,
-};
+// const corsOptions = {
+//   origin: ["https://comilla-website-het6.onrender.com", "http://localhost:5173", "https://comilla-website.vercel.app", "https://www.comillainc.com"],
+//   credentials: true,
+// };
 
-app.use(cors(corsOptions));
+// app.use(cors(corsOptions));
+app.use(cors());
 app.use("/uploads", express.static("uploads"));
 
 const storage = multer.memoryStorage();
