@@ -60,7 +60,6 @@ app.use(
 const corsOptions = {
   origin: ["https://comilla-website-het6.onrender.com", "http://localhost:5173", "https://comilla-website.vercel.app", "https://www.comillainc.com"],
   credentials: true,
-  allowedHeaders: ["Content-Type"],
 };
 
 app.use(cors(corsOptions));
@@ -540,47 +539,47 @@ app.delete("/events/:eventId", async (req, res) => {
   }
 });
 
-app.post("/contact", async (req, res) => {
-  try {
-    const formData = req.body;
+// app.post("/contact", async (req, res) => {
+//   try {
+//     const formData = req.body;
 
-    const emailData = {
-      Messages: [
-        {
-          From: {
-            Email: 'comillaforms@gmail.com',
-            Name: 'New Comilla Inc. Form Inquiry',
-          },
-          To: [
-            {
-              Email: 'rfq@comillainc.com',
-              Name: 'Recipient Name',
-            },
-          ],
-          Subject: 'Comilla Website Form Submission',
-          TextPart: 'You received a new form submission:',
-          HTMLPart: `<p>Name: ${formData.name}</p>
-                    <p>Email: ${formData.email}</p>
-                    <p>Subject: ${formData.subject}</p>
-                    <p>Message: ${formData.message}</p>`,
-        },
-      ],
-    };
+//     const emailData = {
+//       Messages: [
+//         {
+//           From: {
+//             Email: 'comillaforms@gmail.com',
+//             Name: 'New Comilla Inc. Form Inquiry',
+//           },
+//           To: [
+//             {
+//               Email: 'rfq@comillainc.com',
+//               Name: 'Recipient Name',
+//             },
+//           ],
+//           Subject: 'Comilla Website Form Submission',
+//           TextPart: 'You received a new form submission:',
+//           HTMLPart: `<p>Name: ${formData.name}</p>
+//                     <p>Email: ${formData.email}</p>
+//                     <p>Subject: ${formData.subject}</p>
+//                     <p>Message: ${formData.message}</p>`,
+//         },
+//       ],
+//     };
 
-    const request = mailjetClient.post('send', { version: 'v3.1' }).request(emailData);
+//     const request = mailjetClient.post('send', { version: 'v3.1' }).request(emailData);
 
-    request
-      .then((result) => {
-        res.status(200).json({ message: 'Email sent successfully' });
-      })
-      .catch((err) => {
-        res.status(500).json({ error: 'Email not sent' });
-      });
-  } catch (err) {
-    console.error('Error:', err);
-    res.status(500).json({ error: 'Email not sent' });
-  }
-});
+//     request
+//       .then((result) => {
+//         res.status(200).json({ message: 'Email sent successfully' });
+//       })
+//       .catch((err) => {
+//         res.status(500).json({ error: 'Email not sent' });
+//       });
+//   } catch (err) {
+//     console.error('Error:', err);
+//     res.status(500).json({ error: 'Email not sent' });
+//   }
+// });
 
 
 const PORT = process.env.PORT || 9000;
