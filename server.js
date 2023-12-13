@@ -64,7 +64,6 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.use(cors());
 app.use("/uploads", express.static("uploads"));
 
 const storage = multer.memoryStorage();
