@@ -63,6 +63,8 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+
 app.use("/uploads", express.static("uploads"));
 
 app.use((req, res, next) => {
