@@ -64,13 +64,13 @@ app.use(
 
 const corsOptions = {
   origin: ["https://www.comillainc.com"],
-  methods: ['GET', 'POST', 'PATCH', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  // methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+  // allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
 };
 
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
+// app.options('*', cors(corsOptions));
 
 app.use("/uploads", express.static("uploads"));
 
