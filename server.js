@@ -66,7 +66,7 @@ app.use((req, res, next) => {
 });
 
 const corsOptions = {
-  origin: "https://www.comillainc.com",
+  origin: ["https://www.comillainc.com"],
   credentials: true,
 };
 
