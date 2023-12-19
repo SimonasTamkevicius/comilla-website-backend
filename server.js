@@ -51,7 +51,7 @@ const connectDB = async () => {
 const app = express();
 
 const corsOptions = {
-  origin: ["https://www.comillainc.com"],
+  origin: ["https://www.comillainc.com", "http://localhost:5173"],
   methods: ['GET', 'POST', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
@@ -68,7 +68,7 @@ app.use(
 
 app.use(cors(corsOptions));
 
-app.use("/uploads", express.static("uploads"));
+// app.use("/uploads", express.static("uploads"));
 
 const storage = multer.memoryStorage();
 
@@ -274,7 +274,7 @@ app.post('/project', upload, async (req, res) => {
       res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
       res.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE');
       res.header('Access-Control-Allow-Origin', 'https://www.comillainc.com');
-      
+
       res.json({ message: 'Successfully added project!' });
     }
   } catch (err) {
