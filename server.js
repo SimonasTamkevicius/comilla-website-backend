@@ -68,11 +68,11 @@ app.use(
 
 app.use(cors(corsOptions));
 
-// app.use("/uploads", express.static("uploads"));
+app.use("/uploads", express.static("uploads"));
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, 'uploads/'); // Specify your destination directory
+    cb(null, 'uploads/');
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -239,7 +239,7 @@ app.post('/project', upload, async (req, res) => {
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE');
-    res.header('Access-Control-Allow-Origin', 'https://www.comillainc.com');
+    res.header('Access-Control-Allow-Origin', 'https://www.comillainc.com/');
 
     const uploadedImages = {};
     const imageNameArray = [];
@@ -291,7 +291,7 @@ app.post('/project', upload, async (req, res) => {
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE');
-    res.header('Access-Control-Allow-Origin', 'https://www.comillainc.com');
+    res.header('Access-Control-Allow-Origin', 'https://www.comillainc.com/');
     
     res.status(500).json({ message: 'Internal Server Error' });
   }
