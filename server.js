@@ -68,7 +68,6 @@ app.use((req, res, next) => {
 const corsOptions = {
   origin: "https://www.comillainc.com",
   methods: '*',
-  allowedHeaders: '*',
   credentials: true,
 };
 
