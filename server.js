@@ -50,15 +50,6 @@ const connectDB = async () => {
 
 const app = express();
 
-const corsOptions = {
-  origin: ["https://www.comillainc.com", "http://localhost:5173"],
-  methods: ['GET', 'POST', 'PATCH', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
-};
-
-app.options('*', cors(corsOptions));
-
 app.use(express.json());
 app.use(
   bodyParser.urlencoded({
@@ -66,19 +57,17 @@ app.use(
   })
 );
 
+const corsOptions = {
+  origin: ["https://www.comillainc.com", "http://localhost:5173"],
+  credentials: true,
+};
+
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
-app.use("/uploads", express.static("uploads"));
+// app.use("/uploads", express.static("uploads"));
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/');
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix);
-  },
-});
+const storage = multer.memoryStorage();
 
 const upload = multer({
   storage: storage,
@@ -236,11 +225,6 @@ app.post('/project', upload, async (req, res) => {
   try {
     const { name, description, location } = req.body;
 
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE');
-    res.header('Access-Control-Allow-Origin', 'https://www.comillainc.com');
-
     const uploadedImages = {};
     const imageNameArray = [];
     const urlArray = [];
@@ -287,12 +271,6 @@ app.post('/project', upload, async (req, res) => {
     }
   } catch (err) {
     console.error(err);
-
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE');
-    res.header('Access-Control-Allow-Origin', 'https://www.comillainc.com');
-    
     res.status(500).json({ message: 'Internal Server Error' });
   }
 });
