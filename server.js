@@ -258,14 +258,8 @@ app.post('/project', upload, async (req, res) => {
 
     const foundProject = await Project.findOne({ name }).exec();
     if (foundProject) {
-      res.header('Access-Control-Allow-Origin', '*');
-      res.header('Access-Control-Allow-Methods', 'POST');
-      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
       return res.status(400).json({ message: 'Duplicate Project found.' });
     } else {
-      res.header('Access-Control-Allow-Origin', '*');
-      res.header('Access-Control-Allow-Methods', 'POST');
-      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
       const newProject = new Project({
         name,
         description,
@@ -275,14 +269,21 @@ app.post('/project', upload, async (req, res) => {
       });
 
       await newProject.save();
+
+      res.header('Access-Control-Allow-Credentials', 'true');
+      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      res.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE');
+      res.header('Access-Control-Allow-Origin', 'https://www.comillainc.com');
+      
       res.json({ message: 'Successfully added project!' });
     }
   } catch (err) {
     console.error(err);
 
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'POST');
+    res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE');
+    res.header('Access-Control-Allow-Origin', 'https://www.comillainc.com');
     
     res.status(500).json({ message: 'Internal Server Error' });
   }
